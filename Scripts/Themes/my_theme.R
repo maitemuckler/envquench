@@ -1,5 +1,3 @@
-source("~/Work/Research/Astronomy/Projects/envquenching/Scripts/Themes/ggplot_theme_Publication-2.R")
-
 my_theme <- theme(panel.grid.major = element_line(colour = "grey90"),
                   panel.grid.minor = element_line(colour = "grey90"),
                   panel.background = element_blank(), 
@@ -56,7 +54,8 @@ label_logssfr       <- expression(log["10"]~(sSFR/yr^-1))
 label_logsfr        <- expression(log["10"]~(SFR/M["☉"]~yr^-1))
 
 label_logMstar      <- expression(log["10"]~(M["★"]/M["☉"]))
-label_logMgroup     <- expression(log["10"]~(M["h"]/h^-1~M["☉"]))
+#label_logMgroup     <- expression(log["10"]~(M["h"]/h^-1~M["☉"])) # com h^-1
+label_logMgroup     <- expression(log["10"]~(M["h"]/M["☉"]))
 label_logvelDisp_e  <- expression(log["10"]~(sigma/km~s^-1))
 label_velDisp_e     <- expression(sigma~(km~s^-1))
 label_logRproj_rvir <- expression(log["10"]~(R["proj"]/r["vir"]))
