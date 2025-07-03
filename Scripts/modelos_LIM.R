@@ -47,8 +47,6 @@ data.c <- subset(df, df$type == "Central")
 fit_fSFG <- glm(SF ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
 fit_fLTG <- glm(LT ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
 
-# Medidas do modelo:
-
 # Predição
 
 data.s$pred_fSFG <- predict(fit_fSFG, data.s, type = "response")
@@ -68,20 +66,18 @@ acuracia_fLTG
 # Remove outliers pedidos pela Marina (só da figura)
 data.s <- subset(data.s, velDisp_e <= 200)
 
-# Categorias para sigma (dispersão de velocidades)
+# Categorias para sigma 
 breaks_sigma  <- c(30, 60, 80, 200)
 levels_sigma  <- c("30 ≤ σₑ (km/s) < 60", "60 ≤ σₑ (km/s) < 80", "80 ≤ σₑ (km/s) ≤ 200")
+
+data.s$sigma_char <- cut(10^data.s$logvelDisp_e, breaks = breaks_sigma, labels = levels_sigma, include.lowest = TRUE, right = FALSE)
+data.s$sigma_char <- factor(data.s$sigma_char, levels = levels_sigma)
 
 # Categorias para logMgroup
 breaks_logMgroup  <- c(-Inf, 13.5, Inf)
 levels_logMgroup  <- c("< 13.5", "≥ 13.5")
 facet_labels_logMgroup <- c("< 13.5" = "log[10](M[h]/M['\\u2609']) < 13.5", "≥ 13.5" = "log[10](M[h]/M['\\u2609']) >= 13.5")
 
-# Categoriza sigma
-data.s$sigma_char <- cut(10^data.s$logvelDisp_e, breaks = breaks_sigma, labels = levels_sigma, include.lowest = TRUE, right = FALSE)
-data.s$sigma_char <- factor(data.s$sigma_char, levels = levels_sigma)
-
-# Categoriza logMgroup
 data.s$logMgroup_char <- cut(data.s$logMgroup, breaks = breaks_logMgroup, labels = levels_logMgroup, include.lowest = TRUE, right = FALSE)
 data.s$logMgroup_char <- factor(data.s$logMgroup_char, levels = levels_logMgroup)
 
@@ -254,11 +250,16 @@ padding_df <- limites_x %>%
   select(sigma_char, logMgroup_char, x, y, modelo)
 
 label_df <- data.frame(
-  x = -0.5,
-  y = 0.22,
+  x = -1,
+  y = 0.1,
   label = 'italic(LI-M["★"]~sample)',
-  sigma_char = levels_sigma[1]
+  sigma_char = levels_sigma[1],
+  logMgroup_char = levels_logMgroup[2]
+  
 )
+
+label_df$sigma_char     <- factor(label_df$sigma_char, levels = levels_sigma)
+label_df$logMgroup_char <- factor(label_df$logMgroup_char, levels = levels_logMgroup)
 
 # Gráfico final 
 ggplot() + 
@@ -292,6 +293,14 @@ ggplot() +
             inherit.aes = FALSE,
             color = "black", size = 3,
             angle = -90) +
+  
+  # Adiciona nome da amostra
+  geom_text(data = label_df,
+            aes(x = x, y = y, label = label),
+            parse = TRUE,
+            inherit.aes = FALSE,
+            hjust = 0,
+            size = 5) +
 
   facet_grid(logMgroup_char ~ sigma_char,
              scales = "free_x",
@@ -327,10 +336,10 @@ ggplot() +
     strip.text.y = element_text(face = "plain")
   )
 
-# ggsave(path = wdfigs,
-#        filename = paste0("logistic_LIM.pdf"),
-#        device = cairo_pdf, width = width_figs, height = height_figs, 
-#        units = "in", dpi = 600)
+ ggsave(path = wdfigs,
+       filename = paste0("logistic_LIM.pdf"),
+       device = cairo_pdf, width = width_figs, height = height_figs,
+       units = "in", dpi = 600)
 
 # Table com Delta_r
 
