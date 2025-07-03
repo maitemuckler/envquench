@@ -44,8 +44,8 @@ data.s <- subset(df, df$type == "Satellite")
 data.c <- subset(df, df$type == "Central")
 
 # Ajusta modelos 
-fit_fSFG <- glm(SF ~ logvelDisp_e + logRproj_rvir + logMgroup, family = binomial("logit"), data = data.s)
-fit_fLTG <- glm(LT ~ logvelDisp_e + logRproj_rvir + logMgroup, family = binomial("logit"), data = data.s)
+fit_fSFG <- glm(SF ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
+fit_fLTG <- glm(LT ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
 
 # Medidas do modelo:
 
