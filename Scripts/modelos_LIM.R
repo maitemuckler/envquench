@@ -327,10 +327,26 @@ ggplot() +
     strip.text.y = element_text(face = "plain")
   )
 
-ggsave(path = wdfigs,
-       filename = paste0("logistic_LIM.pdf"),
-       device = cairo_pdf, width = width_figs, height = height_figs, 
-       units = "in", dpi = 600)
+# ggsave(path = wdfigs,
+#        filename = paste0("logistic_LIM.pdf"),
+#        device = cairo_pdf, width = width_figs, height = height_figs, 
+#        units = "in", dpi = 600)
+
+# Table com Delta_r
+
+delta_r <- extremos_df[,c("modelo", "sigma_char", "logMgroup_char", "tipo_ponto", "y")]
+delta_r$y_perc      <- round(delta_r$y * 100)
+
+delta_r <- delta_r %>%
+  group_by(modelo, sigma_char, logMgroup_char) %>%
+  mutate(delta_y = (y[tipo_ponto == "max"] - y[tipo_ponto == "min"]) / y[tipo_ponto == "min"]) %>%
+  mutate(delta_y_perc = (y_perc[tipo_ponto == "max"] - y_perc[tipo_ponto == "min"]) / y_perc[tipo_ponto == "min"])
+
+delta_r$delta_y      <- round(delta_r$delta_y * 100)
+delta_r$delta_y_perc <- round(delta_r$delta_y_perc * 100)
+
+tab_delta_r <- delta_r %>% select(modelo, sigma_char, logMgroup_char, delta_y, delta_y_perc) %>% unique() # tabela que vai no artigo
+
 
 ### Tabelas de coeficientes, OR, etc -------------
 
@@ -379,10 +395,6 @@ OR_table_fLTG <- data.frame(
 rownames(OR_table_fLTG) <- NULL
 
 OR_table_fLTG
-
-
-
-
 
 # Tabelas adicionais
 # Valores medianos dos modelos
