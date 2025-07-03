@@ -1,7 +1,7 @@
 ## Diretórios ----
 wdcode <- "Scripts/"
 wddata <- "~/Work/Research/Astronomy/Data/environmental-quenching-data/"
-wdfigs <- "~/Work/Research/Astronomy/Projects/envquenching/Figures/"
+wdfigs <- "~/Work/Research/Astronomy/Projects/envquench/Figures/"
 
 # Bibliotecas ----
 library(data.table)
@@ -18,6 +18,7 @@ library(ggtext)
 library(tidyr)
 
 # Códigos extras ----
+source("Scripts/Themes/ggplot_theme_Publication-2.R")
 source("Scripts/Themes/my_theme.R")
 
 # Opções ----
@@ -30,26 +31,19 @@ width_figs  <- 11
 height_figs <- 7
 
 # Dados ----
-input_data <- paste0("inputdata_zmax0.03_Rlim2.5_Ma12.3_flag_good==1_MANGLE_logMstar_min9.17.csv")
+input_data <- paste0("inputdata_zmax0.03_Rlim2.5_Ma12.3_logMstar_min9.17.csv")
 df         <- fread(paste0(wddata, "inputModel/", input_data))
 
-df$SF_char <- df$SF_GSWLC
+df$SF_char <- df$SF
 df$SF      <- ifelse(df$SF_char == "Star-forming", 1, 0)
 
-df$LT <- ifelse(df$TType >= TType_lim, 1, 0)
+df$LT <- ifelse(df$TType_label == "LTG", 1, 0)
 df$LT <- as.factor(df$LT)
 
 data.s <- subset(df, df$type == "Satellite")
 data.c <- subset(df, df$type == "Central")
 
-# Categoriza logMgroup
-data.s$logMgroup_char <- ifelse(data.s$logMgroup < 13.5, "< 13.5", "≥ 13.5")
-data.s$logMgroup_char <- factor(data.s$logMgroup_char, levels = c("< 13.5", "≥ 13.5"))
-
-# Remove outliers pedidos pela Marina
-data.s <- subset(data.s, velDisp_e <= 200)
-
-# Ajusta modelos com logMgroup
+# Ajusta modelos 
 fit_fSFG <- glm(SF ~ logvelDisp_e + logRproj_rvir + logMgroup, family = binomial("logit"), data = data.s)
 fit_fLTG <- glm(LT ~ logvelDisp_e + logRproj_rvir + logMgroup, family = binomial("logit"), data = data.s)
 
@@ -69,57 +63,68 @@ misClass_fLTG    <- misClassError(data.s$LT, data.s$pred_fLTG, threshold = optim
 acuracia_fLTG    <- 1 - misClass_fLTG
 acuracia_fLTG
 
-# ------------- FIGURA:
+### FIGURA --------------------------
 
-# Define os limites dos bins de dispersão em km/s
-bins_velDisp <- c(30, 60, 80, 200)
-# Converte para log10(velDisp) para comparar com logvelDisp_e
-vetor_prob <- log10(bins_velDisp)
+# Remove outliers pedidos pela Marina (só da figura)
+data.s <- subset(data.s, velDisp_e <= 200)
+
+# Categorias para sigma (dispersão de velocidades)
+breaks_sigma  <- c(30, 60, 80, 200)
+levels_sigma  <- c("30 ≤ σₑ (km/s) < 60", "60 ≤ σₑ (km/s) < 80", "80 ≤ σₑ (km/s) ≤ 200")
+
+# Categorias para logMgroup
+breaks_logMgroup  <- c(-Inf, 13.5, Inf)
+levels_logMgroup  <- c("< 13.5", "≥ 13.5")
+facet_labels_logMgroup <- c("< 13.5" = "log[10](M[h]/M['\\u2609']) < 13.5", "≥ 13.5" = "log[10](M[h]/M['\\u2609']) >= 13.5")
+
+# Categoriza sigma
+data.s$sigma_char <- cut(10^data.s$logvelDisp_e, breaks = breaks_sigma, labels = levels_sigma, include.lowest = TRUE, right = FALSE)
+data.s$sigma_char <- factor(data.s$sigma_char, levels = levels_sigma)
+
+# Categoriza logMgroup
+data.s$logMgroup_char <- cut(data.s$logMgroup, breaks = breaks_logMgroup, labels = levels_logMgroup, include.lowest = TRUE, right = FALSE)
+data.s$logMgroup_char <- factor(data.s$logMgroup_char, levels = levels_logMgroup)
 
 # Inicializa data frames
 modelos <- bins_total <- data.frame()
 
 # Define domínio fixo de Rproj (global para todos os painéis)
-range_logRproj <- range(data.s$logRproj_rvir)
+range_logRproj     <- range(data.s$logRproj_rvir)
 bins_logRproj_rvir <- seq(range_logRproj[1], range_logRproj[2], by = 0.01)
 
-# Loop por painel_logvelDisp_e e logMgroup_char
-for (a in 1:(length(vetor_prob)-1)) {
-  lw <- vetor_prob[a]
-  up <- vetor_prob[a+1]
+# Loop por sigma_char e logMgroup_char
+for (sigma_label in levels(data.s$sigma_char)) {
   
-  faixa <- paste0("[", round(10^lw), ", ", round(10^up), ifelse(up < log10(200), ")", "]"))
-  data_painel <- subset(data.s, logvelDisp_e >= lw & logvelDisp_e < up)
+  data_sigma <- subset(data.s, sigma_char == sigma_label)
   
   for (grupo in levels(data.s$logMgroup_char)) {
-    data_sub <- subset(data_painel, logMgroup_char == grupo)
+    
+    data_sub <- subset(data_sigma, logMgroup_char == grupo)
     if (nrow(data_sub) == 0) next
     
-    # Usar domínio fixo para todos os modelos
-    bins_logRproj_rvir <- bins_logRproj_rvir
-    
     modelo <- data.frame(
-      logvelDisp_e = median(data_sub$logvelDisp_e),
-      logRproj_rvir = bins_logRproj_rvir,
-      logMgroup = median(data_sub$logMgroup)
+      logvelDisp_e   = median(data_sub$logvelDisp_e),
+      logRproj_rvir  = bins_logRproj_rvir,
+      logMgroup      = median(data_sub$logMgroup)
     )
     
     pred_fSFG <- predict(fit_fSFG, type = "link", se.fit = TRUE, newdata = modelo)
     pred_fLTG <- predict(fit_fLTG, type = "link", se.fit = TRUE, newdata = modelo)
     
     modelo$pred_fSFG_prob <- fit_fSFG$family$linkinv(pred_fSFG$fit)
-    modelo$prob_fSFG_upr <- fit_fSFG$family$linkinv(pred_fSFG$fit + critval * pred_fSFG$se.fit)
-    modelo$prob_fSFG_lwr <- fit_fSFG$family$linkinv(pred_fSFG$fit - critval * pred_fSFG$se.fit)
+    modelo$prob_fSFG_upr  <- fit_fSFG$family$linkinv(pred_fSFG$fit + critval * pred_fSFG$se.fit)
+    modelo$prob_fSFG_lwr  <- fit_fSFG$family$linkinv(pred_fSFG$fit - critval * pred_fSFG$se.fit)
     
     modelo$pred_fLTG_prob <- fit_fLTG$family$linkinv(pred_fLTG$fit)
-    modelo$prob_fLTG_upr <- fit_fLTG$family$linkinv(pred_fLTG$fit + critval * pred_fLTG$se.fit)
-    modelo$prob_fLTG_lwr <- fit_fLTG$family$linkinv(pred_fLTG$fit - critval * pred_fLTG$se.fit)
+    modelo$prob_fLTG_upr  <- fit_fLTG$family$linkinv(pred_fLTG$fit + critval * pred_fLTG$se.fit)
+    modelo$prob_fLTG_lwr  <- fit_fLTG$family$linkinv(pred_fLTG$fit - critval * pred_fLTG$se.fit)
     
-    modelo$painel_logvelDisp_e <- faixa
-    modelo$logMgroup_char <- grupo
+    modelo$sigma_char      <- sigma_label
+    modelo$logMgroup_char  <- grupo
     
     modelos <- rbind(modelos, modelo)
     
+    # Criação dos bins de logRproj_rvir e cálculo das frações
     aux <- quantile(data_sub$logRproj_rvir, probs = seq(0, 1, by = 0.2))
     for (i in 1:(length(aux)-1)) {
       bin <- data_sub$logRproj_rvir >= aux[i] & data_sub$logRproj_rvir < aux[i+1]
@@ -127,7 +132,7 @@ for (a in 1:(length(vetor_prob)-1)) {
       if (nrow(bin_data) == 0) next
       
       meio_bin <- median(c(aux[i], aux[i+1]))
-      ngal <- nrow(bin_data)
+      ngal     <- nrow(bin_data)
       
       ngal_SF <- sum(bin_data$SF == 1)
       ngal_LT <- sum(bin_data$LT == 1)
@@ -141,12 +146,12 @@ for (a in 1:(length(vetor_prob)-1)) {
       fLTG_lw <- binom.confint(ngal_LT, ngal, conf.level = 0.95, method = "bayes")$lower
       
       bins <- data.frame(
-        painel_logvelDisp_e = faixa,
-        meio_bin = meio_bin,
-        fSFG = fSFG, fSFG_up = fSFG_up, fSFG_lw = fSFG_lw,
-        fLTG = fLTG, fLTG_up = fLTG_up, fLTG_lw = fLTG_lw,
-        logMgroup_char = grupo,
-        ngal = ngal
+        sigma_char        = sigma_label,
+        meio_bin          = meio_bin,
+        fSFG              = fSFG, fSFG_up = fSFG_up, fSFG_lw = fSFG_lw,
+        fLTG              = fLTG, fLTG_up = fLTG_up, fLTG_lw = fLTG_lw,
+        logMgroup_char    = grupo,
+        ngal              = ngal
       )
       
       bins_total <- rbind(bins_total, bins)
@@ -154,16 +159,15 @@ for (a in 1:(length(vetor_prob)-1)) {
   }
 }
 
-# Plotagem
 # Fatores ordenados
-modelos$painel_logvelDisp_e <- factor(modelos$painel_logvelDisp_e)
-bins_total$painel_logvelDisp_e <- factor(bins_total$painel_logvelDisp_e)
-modelos$logMgroup_char <- factor(modelos$logMgroup_char, levels = c("< 13.5", "≥ 13.5"))
-bins_total$logMgroup_char <- factor(bins_total$logMgroup_char, levels = c("< 13.5", "≥ 13.5"))
+modelos$sigma_char        <- factor(modelos$sigma_char, levels = levels_sigma)
+bins_total$sigma_char     <- factor(bins_total$sigma_char, levels = levels_sigma)
+modelos$logMgroup_char    <- factor(modelos$logMgroup_char, levels = levels_logMgroup)
+bins_total$logMgroup_char <- factor(bins_total$logMgroup_char, levels = levels_logMgroup)
 
 # 1. Calcula os valores extremos diretamente de modelos
 extremos_df <- modelos %>%
-  group_by(painel_logvelDisp_e, logMgroup_char) %>%
+  group_by(sigma_char, logMgroup_char) %>%
   summarise(
     x_min = min(logRproj_rvir),
     x_max = max(logRproj_rvir),
@@ -189,38 +193,38 @@ extremos_df <- modelos %>%
 x_offset <- 0.3  # mais conservador
 extremos_df <- extremos_df %>%
   mutate(
-    painel_full_id = paste0(painel_logvelDisp_e, "___", logMgroup_char),
+    painel_full_id = paste0(sigma_char, "___", logMgroup_char),
     
     vjust_label = case_when(
-      painel_full_id == "[30, 60)___< 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
-      painel_full_id == "[30, 60)___< 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
-      painel_full_id == "[30, 60)___< 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.1,
-      painel_full_id == "[30, 60)___< 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___< 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___< 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___< 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.1,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___< 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
       
-      painel_full_id == "[60, 80)___< 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
-      painel_full_id == "[60, 80)___< 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
-      painel_full_id == "[60, 80)___< 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
-      painel_full_id == "[60, 80)___< 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___< 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___< 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___< 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___< 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
       
-      painel_full_id == "[80, 200]___< 13.5"  & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
-      painel_full_id == "[80, 200]___< 13.5"  & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
-      painel_full_id == "[80, 200]___< 13.5"  & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
-      painel_full_id == "[80, 200]___< 13.5"  & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___< 13.5"  & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___< 13.5"  & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___< 13.5"  & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___< 13.5"  & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
       
-      painel_full_id == "[30, 60)___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.2,
-      painel_full_id == "[30, 60)___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.4,
-      painel_full_id == "[30, 60)___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.8,
-      painel_full_id == "[30, 60)___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.5,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.2,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.4,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.8,
+      painel_full_id == "30 ≤ σₑ (km/s) < 60___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.5,
       
-      painel_full_id == "[60, 80)___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
-      painel_full_id == "[60, 80)___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
-      painel_full_id == "[60, 80)___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
-      painel_full_id == "[60, 80)___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___≥ 13.5"   & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
+      painel_full_id == "60 ≤ σₑ (km/s) < 80___≥ 13.5"   & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
       
-      painel_full_id == "[80, 200]___≥ 13.5"  & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
-      painel_full_id == "[80, 200]___≥ 13.5"  & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
-      painel_full_id == "[80, 200]___≥ 13.5"  & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
-      painel_full_id == "[80, 200]___≥ 13.5"  & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___≥ 13.5"  & modelo == "fSFG" & tipo_ponto == "min" ~ -1.0,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___≥ 13.5"  & modelo == "fLTG" & tipo_ponto == "min" ~  1.5,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___≥ 13.5"  & modelo == "fSFG" & tipo_ponto == "max" ~ -0.7,
+      painel_full_id == "80 ≤ σₑ (km/s) ≤ 200___≥ 13.5"  & modelo == "fLTG" & tipo_ponto == "max" ~  1.6,
       
       TRUE ~ 0
     ),
@@ -230,7 +234,7 @@ extremos_df <- extremos_df %>%
 
 # 3. Cria padding_df para forçar expansão por painel com pontos invisíveis
 limites_x <- modelos %>%
-  group_by(painel_logvelDisp_e, logMgroup_char) %>%
+  group_by(sigma_char, logMgroup_char) %>%
   summarise(
     x_min = min(logRproj_rvir),
     x_max = max(logRproj_rvir),
@@ -247,69 +251,55 @@ padding_df <- limites_x %>%
     modelo = "fSFG"
   ) %>%
   pivot_longer(cols = c(x_min_exp, x_max_exp), names_to = NULL, values_to = "x") %>%
-  select(painel_logvelDisp_e, logMgroup_char, x, y, modelo)
-
+  select(sigma_char, logMgroup_char, x, y, modelo)
 
 label_df <- data.frame(
   x = -0.5,
   y = 0.22,
   label = 'italic(LI-M["★"]~sample)',
-  painel_logvelDisp_e = modelos$painel_logvelDisp_e[1]
+  sigma_char = levels_sigma[1]
 )
 
-facet_labels_logMgroup <- c(
-  "< 13.5" = "log[10](M[h]/h^-1*M['\\u2609']) < 13.5",
-  "≥ 13.5" = "log[10](M[h]/h^-1*M['\\u2609']) >= 13.5"
-)
-
-
-# Gráfico final
+# Gráfico final 
 ggplot() + 
-  geom_line(data = modelos, aes(x = logRproj_rvir, y = pred_fSFG_prob, color = "fSFG", group = interaction(painel_logvelDisp_e, logMgroup_char)), linewidth = 1) + 
-  geom_ribbon(data = modelos, aes(ymin = prob_fSFG_lwr, ymax = prob_fSFG_upr, x = logRproj_rvir, fill = "fSFG", group = interaction(painel_logvelDisp_e, logMgroup_char)), alpha = 0.5, show.legend = FALSE) + 
+  geom_line(data = modelos, aes(x = logRproj_rvir, y = pred_fSFG_prob, color = "fSFG", group = interaction(sigma_char, logMgroup_char)), linewidth = 1) + 
+  geom_ribbon(data = modelos, aes(ymin = prob_fSFG_lwr, ymax = prob_fSFG_upr, x = logRproj_rvir, fill = "fSFG", group = interaction(sigma_char, logMgroup_char)), alpha = 0.5, show.legend = FALSE) + 
   
-  geom_line(data = modelos, aes(x = logRproj_rvir, y = pred_fLTG_prob, color = "fLTG", group = interaction(painel_logvelDisp_e, logMgroup_char)), linewidth = 1) + 
-  geom_ribbon(data = modelos, aes(ymin = prob_fLTG_lwr, ymax = prob_fLTG_upr, x = logRproj_rvir, fill = "fLTG", group = interaction(painel_logvelDisp_e, logMgroup_char)), alpha = 0.5, show.legend = FALSE) + 
+  geom_line(data = modelos, aes(x = logRproj_rvir, y = pred_fLTG_prob, color = "fLTG", group = interaction(sigma_char, logMgroup_char)), linewidth = 1) + 
+  geom_ribbon(data = modelos, aes(ymin = prob_fLTG_lwr, ymax = prob_fLTG_upr, x = logRproj_rvir, fill = "fLTG", group = interaction(sigma_char, logMgroup_char)), alpha = 0.5, show.legend = FALSE) + 
   
-  geom_point(data = bins_total, aes(x = meio_bin, y = fSFG, color = "fSFG", group = interaction(painel_logvelDisp_e, logMgroup_char)), size = 2) +
-  geom_errorbar(data = bins_total, aes(ymin = fSFG_lw, ymax = fSFG_up, x = meio_bin, color = "fSFG", group = interaction(painel_logvelDisp_e, logMgroup_char)), width = 0.1) + 
+  geom_point(data = bins_total, aes(x = meio_bin, y = fSFG, color = "fSFG", group = interaction(sigma_char, logMgroup_char)), size = 2) +
+  geom_errorbar(data = bins_total, aes(ymin = fSFG_lw, ymax = fSFG_up, x = meio_bin, color = "fSFG", group = interaction(sigma_char, logMgroup_char)), width = 0.1) + 
   
-  geom_point(data = bins_total, aes(x = meio_bin, y = fLTG, color = "fLTG", group = interaction(painel_logvelDisp_e, logMgroup_char)), size = 2) +
-  geom_errorbar(data = bins_total, aes(ymin = fLTG_lw, ymax = fLTG_up, x = meio_bin, color = "fLTG", group = interaction(painel_logvelDisp_e, logMgroup_char)), width = 0.1) + 
+  geom_point(data = bins_total, aes(x = meio_bin, y = fLTG, color = "fLTG", group = interaction(sigma_char, logMgroup_char)), size = 2) +
+  geom_errorbar(data = bins_total, aes(ymin = fLTG_lw, ymax = fLTG_up, x = meio_bin, color = "fLTG", group = interaction(sigma_char, logMgroup_char)), width = 0.1) + 
   
   # Pontos nos extremos das curvas
   geom_point(data = extremos_df, 
-             aes(x = x, y = y, color = modelo, group = painel_logvelDisp_e),
+             aes(x = x, y = y, color = modelo, group = sigma_char),
              size = 3, shape = 21, fill = "white", stroke = 1.2) +
   
   # Rótulos percentuais nos extremos
   geom_text(data = extremos_df,
             aes(x = x_label, y = y, label = percent(y, accuracy = 1), 
-                color = modelo, group = painel_logvelDisp_e, 
+                color = modelo, group = sigma_char, 
                 vjust = vjust_label),
             size = 4, show.legend = FALSE) +
   
   # Número de galáxias por bin
   geom_text(data = bins_total,
-            aes(x = meio_bin, y = 1.2, label = ngal, group = interaction(painel_logvelDisp_e, logMgroup_char)),
+            aes(x = meio_bin, y = 1.2, label = ngal, group = interaction(sigma_char, logMgroup_char)),
             inherit.aes = FALSE,
             color = "black", size = 3,
             angle = -90) +
-  
-  # geom_text(data = bins_total,
-  #           aes(x = meio_bin, y = 1.1, label = ngal, group = interaction(painel_logvelDisp_e, logMgroup_char)),
-  #           inherit.aes = FALSE,
-  #           color = "#7FD23F", size = 3.5) + 
 
-  #facet_grid(logMgroup_char ~ painel_logvelDisp_e, scales = "free_x") + 
-  facet_grid(logMgroup_char ~ painel_logvelDisp_e, 
+  facet_grid(logMgroup_char ~ sigma_char,
              scales = "free_x",
              labeller = labeller(
-               logMgroup_char = as_labeller(facet_labels_logMgroup, label_parsed)
-             )) + 
+             logMgroup_char = as_labeller(facet_labels_logMgroup, label_parsed))) + 
   
   # Padding invisível para forçar expansão do eixo X em cada facet
-  geom_blank(data = padding_df, aes(x = x, group = interaction(painel_logvelDisp_e, logMgroup_char))) +
+  geom_blank(data = padding_df, aes(x = x, group = interaction(sigma_char, logMgroup_char))) +
   
   ylab("Fraction") + 
   xlab(expression(log[10](R[proj]/r[vir]))) + 
@@ -320,7 +310,7 @@ ggplot() +
   scale_fill_manual(values = c("fSFG" = "#9B5DE5", "fLTG" = "#7FD23F")) + 
   
   scale_y_continuous(breaks = c(0, 0.25, 0.5, 0.75, 1), limits = c(0, 1.23)) +
-  scale_x_continuous(sec.axis = sec_axis(~ . , expression(paste(sigma[e], " (km/s)")), breaks = NULL, labels = NULL)) + 
+  #scale_x_continuous(sec.axis = sec_axis(~ . , expression(paste(sigma[e], " (km/s)")), breaks = NULL, labels = NULL)) + 
   
   theme_Publication() + 
   theme(
@@ -332,7 +322,9 @@ ggplot() +
     legend.box.just = "left",
     legend.text = element_text(size = 14),
     legend.title = element_blank(),
-    legend.margin = margin(t = 2, r = 2, b = 2, l = 2, unit = "pt")
+    legend.margin = margin(t = 2, r = 2, b = 2, l = 2, unit = "pt"),
+    strip.text.x = element_text(face = "plain"),
+    strip.text.y = element_text(face = "plain")
   )
 
 ggsave(path = wdfigs,
@@ -340,8 +332,60 @@ ggsave(path = wdfigs,
        device = cairo_pdf, width = width_figs, height = height_figs, 
        units = "in", dpi = 600)
 
+### Tabelas de coeficientes, OR, etc -------------
+
+# Modelo fSFG
+summary(fit_fSFG)
+confint(fit_fSFG)
+# Odds Ratio
+OR_fSFG <- exp(coef(fit_fSFG))
+OR_fSFG
+
+# IC para Odds Ratio
+conf_int_OR_fSFG <- exp(confint(fit_fSFG))
+conf_int_OR_fSFG
+
+# Tabela para OR
+OR_table_fSFG <- data.frame(
+  Variable = names(OR_fSFG),
+  OR = OR_fSFG,
+  Lower95 = conf_int_OR_fSFG[,1],
+  Upper95 = conf_int_OR_fSFG[,2]
+)
+
+rownames(OR_table_fSFG) <- NULL
+
+OR_table_fSFG
+
+# Modelo fLTG
+summary(fit_fLTG)
+confint(fit_fLTG)
+# Odds Ratio
+OR_fLTG <- exp(coef(fit_fLTG))
+OR_fLTG
+
+# IC para Odds Ratio
+conf_int_OR_fLTG <- exp(confint(fit_fLTG))
+conf_int_OR_fLTG
+
+# Tabela para OR
+OR_table_fLTG <- data.frame(
+  Variable = names(OR_fLTG),
+  OR = OR_fLTG,
+  Lower95 = conf_int_OR_fLTG[,1],
+  Upper95 = conf_int_OR_fLTG[,2]
+)
+
+rownames(OR_table_fLTG) <- NULL
+
+OR_table_fLTG
+
+
+
+
+
 # Tabelas adicionais
 # Valores medianos dos modelos
 
 modelos %>% 
-  distinct(painel_logvelDisp_e, logMgroup_char, round(10^logvelDisp_e, 2), round(logMgroup, 2))
+  distinct(sigma_char, logMgroup_char, round(10^logvelDisp_e, 2), round(logMgroup, 2))
