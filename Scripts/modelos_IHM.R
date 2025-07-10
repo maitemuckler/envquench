@@ -161,13 +161,13 @@ bins_total$logMgroup_char <- factor(bins_total$logMgroup_char, levels = levels_l
 extremos_df <- modelos %>%
   group_by(sigma_char, logMgroup_char) %>%
   summarise(
-    x_min = min(logRproj_rvir),
+    x_min = -1,
     x_max = max(logRproj_rvir),
     
-    pred_fSFG_prob_min = pred_fSFG_prob[which.min(logRproj_rvir)],
+    pred_fSFG_prob_min = pred_fSFG_prob[which.min(abs(logRproj_rvir - x_min))],
     pred_fSFG_prob_max = pred_fSFG_prob[which.max(logRproj_rvir)],
     
-    pred_fLTG_prob_min = pred_fLTG_prob[which.min(logRproj_rvir)],
+    pred_fLTG_prob_min = pred_fLTG_prob[which.min(abs(logRproj_rvir - x_min))],
     pred_fLTG_prob_max = pred_fLTG_prob[which.max(logRproj_rvir)],
     .groups = "drop"
   ) %>%
@@ -181,6 +181,7 @@ extremos_df <- modelos %>%
     x = ifelse(grepl("min", tipo), x_min, x_max),
     tipo_ponto = ifelse(grepl("min", tipo), "min", "max")
   )
+
 
 x_offset <- 0.4  # mais conservador
 extremos_df <- extremos_df %>%
@@ -353,8 +354,10 @@ delta_r <- delta_r %>%
 delta_r$delta_y      <- round(delta_r$delta_y * 100)
 delta_r$delta_y_perc <- round(delta_r$delta_y_perc * 100)
 
-tab_delta_r <- delta_r %>% select(modelo, sigma_char, logMgroup_char, delta_y, delta_y_perc) %>% unique() # tabela que vai no artigo
-
+# tabela que vai no artigo
+tab_delta_r <- 
+  delta_r %>% 
+  select(modelo, sigma_char, logMgroup_char, tipo_ponto, y_perc, delta_y_perc)
 
 ### Tabelas de coeficientes, OR, etc -------------
 
