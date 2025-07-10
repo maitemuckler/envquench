@@ -338,14 +338,17 @@ ggsave(path = wdfigs,
        units = "in", dpi = 600)
 
 # Table com Delta_r
+# f_esperado seria longe, 
+# f_obs seria perto (o que é "observado de efeito ambiental")
+# (f_esperado - f_obs) / f_esperado 
 
 delta_r <- extremos_df[,c("modelo", "sigma_char", "logMgroup_char", "tipo_ponto", "y")]
 delta_r$y_perc      <- round(delta_r$y * 100)
 
 delta_r <- delta_r %>%
   group_by(modelo, sigma_char, logMgroup_char) %>%
-  mutate(delta_y = (y[tipo_ponto == "max"] - y[tipo_ponto == "min"]) / y[tipo_ponto == "min"]) %>%
-  mutate(delta_y_perc = (y_perc[tipo_ponto == "max"] - y_perc[tipo_ponto == "min"]) / y_perc[tipo_ponto == "min"])
+  mutate(delta_y = (y[tipo_ponto == "max"] - y[tipo_ponto == "min"]) / y[tipo_ponto == "max"]) %>%
+  mutate(delta_y_perc = (y_perc[tipo_ponto == "max"] - y_perc[tipo_ponto == "min"]) / y_perc[tipo_ponto == "max"])
 
 delta_r$delta_y      <- round(delta_r$delta_y * 100)
 delta_r$delta_y_perc <- round(delta_r$delta_y_perc * 100)
