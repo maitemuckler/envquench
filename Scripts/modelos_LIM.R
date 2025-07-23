@@ -16,6 +16,7 @@ library(ggthemes)
 library(pROC)
 library(ggtext)
 library(tidyr)
+library(patchwork)
 
 # Códigos extras ----
 source("Scripts/Themes/ggplot_theme_Publication-2.R")
@@ -255,7 +256,6 @@ label_df <- data.frame(
   label = 'italic(LI-M["★"]~sample)',
   sigma_char = levels_sigma[1],
   logMgroup_char = levels_logMgroup[2]
-  
 )
 
 label_df$sigma_char     <- factor(label_df$sigma_char, levels = levels_sigma)
@@ -336,10 +336,10 @@ ggplot() +
     strip.text.y = element_text(face = "plain")
   )
 
- ggsave(path = wdfigs,
-       filename = paste0("logistic_LIM.pdf"),
-       device = cairo_pdf, width = width_figs, height = height_figs,
-       units = "in", dpi = 600)
+ # ggsave(path = wdfigs,
+ #       filename = paste0("logistic_LIM.pdf"),
+ #       device = cairo_pdf, width = width_figs, height = height_figs,
+ #       units = "in", dpi = 600)
 
 # Table com Delta_r
 # f_esperado seria longe, 
@@ -415,3 +415,58 @@ OR_table_fLTG
 
 modelos %>% 
   distinct(sigma_char, logMgroup_char, round(10^logvelDisp_e, 2), round(logMgroup, 2))
+
+# Densidades
+label_df_density <- data.frame(
+  label = 'italic(LI-M["★"]~sample)',
+  sigma_char = levels_sigma[1],
+  logMgroup_char = levels_logMgroup[1]
+)
+
+label_df_density$sigma_char     <- factor(label_df_density$sigma_char, levels = levels_sigma)
+label_df_density$logMgroup_char <- factor(label_df_density$logMgroup_char, levels = levels_logMgroup)
+
+# Gráfico 1: dispersão de velocidades
+p1 <- ggplot(data.s, aes(x = logvelDisp_e)) + 
+  geom_histogram(aes(y = after_stat(density), color = sigma_char), fill = 'white', bins = 8) + 
+  geom_density(aes(fill = sigma_char, color = sigma_char), alpha = 0.5) +
+  scale_color_brewer(palette = "Accent") + 
+  scale_fill_brewer(palette = "Accent") + 
+  facet_grid(. ~ sigma_char, scales = "free_x") + 
+  xlab(label_logvelDisp_e) + 
+  geom_text(data = label_df_density,
+            aes(x = 1.45, y = 8.5, label = label),
+            parse = TRUE, hjust = 0, size = 5) +
+  theme_Publication() + 
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(face = "plain"),
+    strip.text.y = element_text(face = "plain")
+  )
+
+# Gráfico 2: massa do halo
+p2 <- ggplot(data.s, aes(x = logMgroup)) + 
+  geom_histogram(aes(y = after_stat(density), color = logMgroup_char), fill = 'white', bins = 8) + 
+  geom_density(aes(fill = logMgroup_char, color = logMgroup_char), alpha = 0.5) +
+  scale_color_brewer(palette = "Accent") + 
+  scale_fill_brewer(palette = "Accent") + 
+  facet_grid(. ~ logMgroup_char, scales = "free_x") + 
+  xlab(label_logMgroup) + 
+  geom_text(data = label_df_density,
+            aes(x = 12.3, y = 2.2, label = label),
+            parse = TRUE, hjust = 0, size = 5) +
+  theme_Publication() + 
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(face = "plain"),
+    strip.text.y = element_text(face = "plain")
+  )
+
+p1 / p2  
+
+# ggsave(path = wdfigs,
+#        filename = paste0("densidades_LIM.pdf"),
+#        device = cairo_pdf, width = width_figs, height = height_figs,
+#        units = "in", dpi = 600)
+
+
