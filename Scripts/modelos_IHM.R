@@ -16,6 +16,7 @@ library(ggthemes)
 library(pROC)
 library(ggtext)
 library(tidyr)
+library(patchwork)
 
 # Códigos extras ----
 source("Scripts/Themes/ggplot_theme_Publication-2.R")
@@ -167,10 +168,12 @@ modelos$logMgroup_char    <- factor(modelos$logMgroup_char, levels = levels_logM
 bins_total$logMgroup_char <- factor(bins_total$logMgroup_char, levels = levels_logMgroup)
 
 # 1. Calcula os valores extremos diretamente de modelos
+rvir_min <- 0.02
+
 extremos_df <- modelos %>%
   group_by(sigma_char, logMgroup_char) %>%
   summarise(
-    x_min = -1,
+    x_min = log10(rvir_min),
     x_max = max(logRproj_rvir),
     
     pred_fSFG_prob_min = pred_fSFG_prob[which.min(abs(logRproj_rvir - x_min))],
@@ -342,10 +345,10 @@ ggplot() +
     strip.text.y = element_text(face = "plain")
   )
 
-# ggsave(path = wdfigs,
-#        filename = paste0("logistic_IHM.pdf"),
-#        device = cairo_pdf, width = width_figs, height = height_figs, 
-#        units = "in", dpi = 600)
+ggsave(path = wdfigs,
+       filename = paste0("logistic_IHM.pdf"),
+       device = cairo_pdf, width = width_figs, height = height_figs,
+       units = "in", dpi = 600)
 
 # Table com Delta_r
 # f_esperado seria longe, 
@@ -367,6 +370,7 @@ delta_r$delta_y_perc <- round(delta_r$delta_y_perc * 100)
 tab_delta_r <- 
   delta_r %>% 
   select(modelo, sigma_char, logMgroup_char, tipo_ponto, y_perc, delta_y_perc)
+
 
 ### Tabelas de coeficientes, OR, etc -------------
 

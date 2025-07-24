@@ -172,10 +172,12 @@ modelos$logMgroup_char    <- factor(modelos$logMgroup_char, levels = levels_logM
 bins_total$logMgroup_char <- factor(bins_total$logMgroup_char, levels = levels_logMgroup)
 
 # 1. Calcula os valores extremos diretamente de modelos
+rvir_min <- 0.02
+  
 extremos_df <- modelos %>%
   group_by(sigma_char, logMgroup_char) %>%
   summarise(
-    x_min = -1,
+    x_min = log10(rvir_min),
     x_max = max(logRproj_rvir),
     
     pred_fSFG_prob_min = pred_fSFG_prob[which.min(abs(logRproj_rvir - x_min))],
@@ -345,10 +347,10 @@ ggplot() +
     strip.text.y = element_text(face = "plain")
   )
 
- # ggsave(path = wdfigs,
- #       filename = paste0("logistic_LIM.pdf"),
- #       device = cairo_pdf, width = width_figs, height = height_figs,
- #       units = "in", dpi = 600)
+ ggsave(path = wdfigs,
+       filename = paste0("logistic_LIM.pdf"),
+       device = cairo_pdf, width = width_figs, height = height_figs,
+       units = "in", dpi = 600)
 
 # Table com Delta_r
 # f_esperado seria longe, 
