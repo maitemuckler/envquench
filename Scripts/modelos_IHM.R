@@ -43,6 +43,15 @@ df$LT <- as.factor(df$LT)
 data.s <- subset(df, df$type == "Satellite")
 data.c <- subset(df, df$type == "Central")
 
+# nr de grupos
+length(unique(data.s$groupID))
+
+# SF/Q
+table(data.s$SF_char)
+
+# LTG/ETG
+table(data.s$TType_label)
+
 # Ajusta modelos 
 fit_fSFG <- glm(SF ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
 fit_fLTG <- glm(LT ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
