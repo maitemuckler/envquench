@@ -3,11 +3,12 @@ library(data.table)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
+library(scales)
 
 ## Diretórios ----
-wdcode <- "/home/muckler/Work/Research/Astronomy/Projects/envquenching/Scripts/"
+wdcode <- "~/Work/Research/Astronomy/Projects/envquench/Scripts/"
 wddata <- "~/Work/Research/Astronomy/Data/environmental-quenching-data/"
-wdfigs <- "~/Work/Research/Astronomy/Projects/envquenching/Figures/"
+wdfigs <- "~/Work/Research/Astronomy/Projects/envquench/Figures/"
 
 ## Outros códigos e funções ----
 source(file.path(wdcode, "Themes/my_theme.R"))
@@ -72,6 +73,22 @@ df$logsSFR  <- df$logSFR_SED - df$logMstar
 df$SF <- SF_Q_class(df$logsSFR,  df$logMstar, slope = -0.45, intercept = -6.55)
 df$SF <- factor(df$SF, levels = c("Star-forming", "Quiescent"))
 table(df$SF)
+
+ggplot(df, aes(x = logMstar, y = logsSFR)) + 
+  geom_density_2d(color = 'black', linewidth = 1) + 
+  geom_abline(intercept = -6.55, slope = -0.45, linetype = "dashed", linewidth = 1) +
+  scale_y_continuous(breaks = pretty_breaks(n = 10)) + 
+  scale_x_continuous(breaks = pretty_breaks(n = 10)) + 
+  labs(x = label_logMstar,
+       y = label_logssfr,
+       fill = "Level") +
+  theme_Publication() + 
+  theme(text = element_text(size = 28))
+
+ggsave(path = wdfigs,
+       filename = paste0("SF_class.pdf"),
+       device = cairo_pdf, width = width_figs, height = height_figs,
+       units = "in", dpi = 600)
 
 ## Criando variável dicotômica para T-Type ----
 TType_lim      <- 0

@@ -49,9 +49,11 @@ length(unique(data.s$groupID))
 
 # SF/Q
 table(data.s$SF_char)
+round(table(data.s$SF_char)/nrow(data.s)*100)
 
 # LTG/ETG
 table(data.s$TType_label)
+round(table(data.s$TType_label)/nrow(data.s)*100)
 
 # Ajusta modelos 
 fit_fSFG <- glm(SF ~ logvelDisp_e + logMgroup + logRproj_rvir, family = binomial("logit"), data = data.s)
